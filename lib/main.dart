@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 void main() => runApp(MyMain());
 
 class MyMain extends StatefulWidget {
@@ -9,23 +11,8 @@ class MyMain extends StatefulWidget {
   }
 }
 
-class Person {
-  final String name;
-  bool isCheck;
-
-  Person({this.name, this.isCheck});
-}
-
 class _MyMainState extends State<MyMain> {
-  List<Person> _person = [
-    Person(name: "men", isCheck: true),
-    Person(name: "men", isCheck: true),
-    Person(name: "men", isCheck: true),
-    Person(name: "men", isCheck: true),
-    Person(name: "men", isCheck: true),
-    Person(name: "men", isCheck: true),
-    Person(name: "men", isCheck: true)
-  ];
+  var myCollection = Firestore.instance;
 
   @override
   Widget build(BuildContext context) {
@@ -35,30 +22,44 @@ class _MyMainState extends State<MyMain> {
         appBar: AppBar(
           title: Text('this my main'),
         ),
-        body: ListView.builder(
-          itemBuilder: (BuildContext context, int index) {
-            return Card(
-              child: Row(children: <Widget>[
-                Text(
-                  _person[index].name,
-                ),
-                Checkbox(
-                    value: _person[index].isCheck,
-                    onChanged: (value) {
-                      _changeValue(value, index);
-                    })
-              ]),
+        body: StreamBuilder<QuerySnapshot>(
+          stream: myCollection.collection('todo').snapshots(),
+          builder:
+              (BuildContext context, AsyncSnapshot<QuerySnapshot> snapshot) {
+            if (!snapshot.hasData) return LinearProgressIndicator();
+            return ListView.builder(
+              itemBuilder: (BuildContext context, int index) {
+                return Card(
+                  child: Row(
+                    children: <Widget>[
+                      Text(snapshot.data.documents[index].data['title']),
+                      Checkbox(
+                          value: snapshot.data.documents[index].data['isDone'],
+                          onChanged: (value) {
+                            print('path :' +snapshot.data.documents[index].reference.path);
+                            updateNote(
+                                snapshot.data.documents[index], value);
+                          })
+                    ],
+                  ),
+                );
+              },
+              itemCount: snapshot.data.documents.length,
             );
           },
-          itemCount: _person.length,
         ),
+        floatingActionButton: FloatingActionButton(onPressed: () {
+          var data = new Map<String, dynamic>();
+          data['title'] = "men add na kub";
+          data['isDone'] = false;
+          myCollection.collection('todo').add(data);
+        }),
       ),
     );
   }
 
-  void _changeValue(bool value, int index) {
-    setState(() {
-      _person[index].isCheck = value;
-    });
+  Future<dynamic> updateNote(DocumentSnapshot data, bool value) async {
+    data.data['isDone'] = value;
+    myCollection.document(data.reference.path).updateData(data.data);
   }
 }
